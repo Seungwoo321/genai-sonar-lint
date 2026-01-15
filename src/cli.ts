@@ -1,0 +1,75 @@
+#!/usr/bin/env node
+/**
+ * genai-sonar-lint CLI - AI-powered ESLint/SonarJS analyzer and fixer
+ */
+
+import { Command } from 'commander';
+import { analyzeCommand } from './commands/analyze.js';
+import { fixCommand } from './commands/fix.js';
+import { loginCommand } from './commands/login.js';
+import { statusCommand } from './commands/status.js';
+
+const program = new Command();
+
+program
+  .name('genai-sonar-lint')
+  .description('AI-powered ESLint/SonarJS analyzer and fixer using Claude Code or Cursor CLI')
+  .version('0.1.0');
+
+// Analyze command: genai-sonar-lint analyze <path>
+program
+  .command('analyze <path>')
+  .description('Analyze ESLint/SonarJS issues in the specified path')
+  .option('-p, --provider <provider>', 'AI provider (claude-code or cursor-cli)', 'claude-code')
+  .option('-m, --model <model>', 'Model to use')
+  .option('-o, --output <file>', 'Save results to JSON file')
+  .option('-r, --raw', 'Output raw ESLint results without AI analysis')
+  .option('-n, --non-interactive', 'Run without interactive mode')
+  .option('-d, --debug', 'Enable debug mode')
+  .action(analyzeCommand);
+
+// Fix command: genai-sonar-lint fix <path>
+program
+  .command('fix <path>')
+  .description('Auto-fix ESLint issues using eslint --fix')
+  .action(fixCommand);
+
+// Login command: genai-sonar-lint login <provider>
+program
+  .command('login <provider>')
+  .description('Login to AI provider (claude-code or cursor-cli)')
+  .action(loginCommand);
+
+// Status command: genai-sonar-lint status
+program
+  .command('status')
+  .description('Check ESLint configuration and provider status')
+  .option('-p, --provider <provider>', 'AI provider to check')
+  .action(statusCommand);
+
+// Help examples
+program.addHelpText(
+  'after',
+  `
+Examples:
+  $ genai-sonar-lint analyze src/            # Analyze with Claude Code (default)
+  $ genai-sonar-lint analyze src/ -p cursor-cli
+  $ genai-sonar-lint analyze src/ --raw      # Raw ESLint output only
+  $ genai-sonar-lint analyze src/ -o report.json
+
+  $ genai-sonar-lint fix src/                # Auto-fix with eslint --fix
+  $ genai-sonar-lint login claude-code       # Login to Claude Code
+  $ genai-sonar-lint login cursor-cli        # Login to Cursor CLI
+  $ genai-sonar-lint status                  # Check configuration
+
+Interactive actions:
+  [f] Fix      - Apply AI-generated fix
+  [d] Disable  - Disable rule in eslint config
+  [i] Ignore   - Add eslint-disable comment
+  [a] Ask AI   - Ask additional questions
+  [s] Skip     - Skip this rule
+  [q] Quit     - Exit
+`
+);
+
+program.parse();
