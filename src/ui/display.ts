@@ -49,39 +49,56 @@ export function displayRule(
   console.log('');
 
   console.log(`${chalk.bold('📋 Rule:')} ${chalk.yellow(ruleFix.ruleId)} (${ruleFix.count} issues)`);
-  console.log(`${chalk.bold('⚠️  Severity:')} ${ruleFix.severity} | ${chalk.bold('Priority:')} ${ruleFix.explain.priority}`);
+  console.log(`${chalk.bold('⚠️  Severity:')} ${ruleFix.severity} | ${chalk.bold('Priority:')} ${ruleFix.explain?.priority ?? 'N/A'}`);
   console.log('');
 
   console.log(chalk.dim('── AI Analysis ──────────────────────────────────────────────'));
-  console.log(`${chalk.bold('🔴 Problem:')} ${ruleFix.explain.problemDescription}`);
-  console.log(`${chalk.bold('❓ Why:')} ${ruleFix.explain.whyProblem}`);
-  console.log(`${chalk.bold('✅ How to fix:')} ${ruleFix.explain.howToFix}`);
+  console.log(`${chalk.bold('🔴 Problem:')} ${ruleFix.explain?.problemDescription ?? 'N/A'}`);
+  console.log(`${chalk.bold('❓ Why:')} ${ruleFix.explain?.whyProblem ?? 'N/A'}`);
+  console.log(`${chalk.bold('✅ How to fix:')} ${ruleFix.explain?.howToFix ?? 'N/A'}`);
   console.log('');
 
   // Display fixes preview
   console.log(chalk.dim('── [f] Fix Preview (AI generated) ───────────────────────────'));
-  for (const fix of ruleFix.fixes) {
-    const fileShort = fix.file.split('/').pop();
-    const lineRange = fix.startLine === fix.endLine
-      ? `${fix.startLine}`
-      : `${fix.startLine}-${fix.endLine}`;
 
-    console.log(`${chalk.bold(`📍 ${fileShort}:${lineRange}`)}`);
-    console.log(chalk.red('   Original:'));
-    for (const line of fix.original.split('\n')) {
-      console.log(chalk.red(`   - ${line}`));
-    }
-    console.log(chalk.green('   Fixed:'));
-    for (const line of fix.fixed.split('\n')) {
-      console.log(chalk.green(`   + ${line}`));
-    }
-    console.log(chalk.dim(`   └ ${fix.explanation}`));
+  if (ruleFix.fixes.length === 0) {
+    console.log(chalk.yellow('   No fixes generated'));
     console.log('');
+  } else {
+    for (const fix of ruleFix.fixes) {
+      const fileShort = fix.file?.split('/').pop() ?? 'unknown';
+      const lineRange = fix.startLine === fix.endLine
+        ? `${fix.startLine ?? '?'}`
+        : `${fix.startLine ?? '?'}-${fix.endLine ?? '?'}`;
+
+      console.log(`${chalk.bold(`📍 ${fileShort}:${lineRange}`)}`);
+
+      if (fix.original) {
+        console.log(chalk.red('   Original:'));
+        for (const line of fix.original.split('\n')) {
+          console.log(chalk.red(`   - ${line}`));
+        }
+      } else {
+        console.log(chalk.red('   Original: (not available)'));
+      }
+
+      if (fix.fixed) {
+        console.log(chalk.green('   Fixed:'));
+        for (const line of fix.fixed.split('\n')) {
+          console.log(chalk.green(`   + ${line}`));
+        }
+      } else {
+        console.log(chalk.yellow('   Fixed: (not available)'));
+      }
+
+      console.log(chalk.dim(`   └ ${fix.explanation ?? 'No explanation'}`));
+      console.log('');
+    }
   }
 
   // Display disable preview
   console.log(chalk.dim('── [d] Disable Preview (AI generated) ────────────────────────'));
-  console.log(`   ${ruleFix.disableConfig.diffDescription}`);
+  console.log(`   ${ruleFix.disableConfig?.diffDescription ?? 'Not available'}`);
   console.log('');
 
   // Display ignore options
