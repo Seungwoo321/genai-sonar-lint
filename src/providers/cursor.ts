@@ -56,7 +56,15 @@ export class CursorCLIProvider implements AIProvider {
 
       const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | cursor agent -p --model ${this.model} --output-format json ${resumeFlag}`;
 
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Command:', cmd.substring(0, 200) + '...');
+      }
+
       const { stdout } = await execAsync(cmd, { timeout: this.timeout });
+
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Raw response:', stdout.substring(0, 500));
+      }
 
       const response = JSON.parse(stdout);
 
@@ -65,14 +73,47 @@ export class CursorCLIProvider implements AIProvider {
         this.sessionId = response.session_id;
       }
 
-      // Parse result from JSON string if needed
-      let data = response.result;
-      if (typeof data === 'string') {
-        try {
-          data = JSON.parse(data);
-        } catch {
-          // Keep as string if not valid JSON
+      // Try multiple possible response structures
+      let data: T | undefined;
+
+      if (response.structured_output) {
+        data = response.structured_output;
+      } else if (response.result) {
+        // result might be a JSON string
+        if (typeof response.result === 'string') {
+          try {
+            data = JSON.parse(response.result);
+          } catch {
+            data = response.result as T;
+          }
+        } else {
+          data = response.result;
         }
+      } else if (response.content) {
+        // Some versions return content directly
+        data = response.content;
+      } else if (response.message) {
+        // Try parsing message as JSON
+        if (typeof response.message === 'string') {
+          try {
+            data = JSON.parse(response.message);
+          } catch {
+            data = response.message as T;
+          }
+        } else {
+          data = response.message;
+        }
+      }
+
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Parsed data:', JSON.stringify(data, null, 2));
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: 'No data found in response',
+        };
       }
 
       return {
@@ -81,6 +122,9 @@ export class CursorCLIProvider implements AIProvider {
         sessionId: this.sessionId,
       };
     } catch (error) {
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Error:', error);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

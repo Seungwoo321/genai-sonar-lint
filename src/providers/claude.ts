@@ -98,6 +98,17 @@ export class ClaudeCodeProvider implements AIProvider {
       } else if (response.content) {
         // Some versions return content directly
         data = response.content;
+      } else if (response.message) {
+        // Try parsing message as JSON
+        if (typeof response.message === 'string') {
+          try {
+            data = JSON.parse(response.message);
+          } catch {
+            data = response.message as T;
+          }
+        } else {
+          data = response.message;
+        }
       }
 
       if (this.debug) {
