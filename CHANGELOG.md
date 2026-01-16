@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0-beta.4](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.3...v0.2.0-beta.4) (2026-01-16)
+
+### Bug Fixes
+
+* **providers:** strip markdown code blocks from AI response ([99cff2d](https://github.com/Seungwoo321/genai-sonar-lint/commit/99cff2dc4879d9531902fd593de1e5befaaddf96))
+
 ## [0.2.0-beta.3](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.2...v0.2.0-beta.3) (2026-01-16)
 
 ### Bug Fixes
