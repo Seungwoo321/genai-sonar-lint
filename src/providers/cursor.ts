@@ -73,33 +73,44 @@ export class CursorCLIProvider implements AIProvider {
         this.sessionId = response.session_id;
       }
 
+      // Helper to strip markdown code blocks and parse JSON
+      const parseJsonString = (str: string): T | undefined => {
+        // Strip markdown code blocks (```json ... ``` or ``` ... ```)
+        let cleaned = str.trim();
+        const codeBlockMatch = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+        if (codeBlockMatch) {
+          cleaned = codeBlockMatch[1].trim();
+        }
+        try {
+          return JSON.parse(cleaned);
+        } catch {
+          return undefined;
+        }
+      };
+
       // Try multiple possible response structures
       let data: T | undefined;
 
       if (response.structured_output) {
         data = response.structured_output;
       } else if (response.result) {
-        // result might be a JSON string
+        // result might be a JSON string (possibly with markdown)
         if (typeof response.result === 'string') {
-          try {
-            data = JSON.parse(response.result);
-          } catch {
-            data = response.result as T;
-          }
+          data = parseJsonString(response.result);
         } else {
           data = response.result;
         }
       } else if (response.content) {
         // Some versions return content directly
-        data = response.content;
+        if (typeof response.content === 'string') {
+          data = parseJsonString(response.content);
+        } else {
+          data = response.content;
+        }
       } else if (response.message) {
         // Try parsing message as JSON
         if (typeof response.message === 'string') {
-          try {
-            data = JSON.parse(response.message);
-          } catch {
-            data = response.message as T;
-          }
+          data = parseJsonString(response.message);
         } else {
           data = response.message;
         }
