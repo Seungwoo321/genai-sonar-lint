@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0-beta.3](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.2...v0.2.0-beta.3) (2026-01-16)
+
+### Bug Fixes
+
+* **interactive:** handle snake_case properties in AI response ([28dce81](https://github.com/Seungwoo321/genai-sonar-lint/commit/28dce8163591d87f6a0e0b5ecdd6539dc7165df3))
+
 ## [0.2.0-beta.2](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.1...v0.2.0-beta.2) (2026-01-16)
 
 ### Bug Fixes
