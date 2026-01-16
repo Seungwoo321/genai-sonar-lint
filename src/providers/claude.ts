@@ -62,7 +62,15 @@ export class ClaudeCodeProvider implements AIProvider {
 
       const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | claude -p --model ${this.model} --output-format json --json-schema '${JSON.stringify(schema)}' ${resumeFlag}`;
 
+      if (this.debug) {
+        console.log('[DEBUG] Command:', cmd.substring(0, 200) + '...');
+      }
+
       const { stdout } = await execAsync(cmd, { timeout: this.timeout });
+
+      if (this.debug) {
+        console.log('[DEBUG] Raw response:', stdout.substring(0, 500));
+      }
 
       const response = JSON.parse(stdout);
 
@@ -71,12 +79,47 @@ export class ClaudeCodeProvider implements AIProvider {
         this.sessionId = response.session_id;
       }
 
+      // Try multiple possible response structures
+      let data: T | undefined;
+
+      if (response.structured_output) {
+        data = response.structured_output;
+      } else if (response.result) {
+        // result might be a JSON string
+        if (typeof response.result === 'string') {
+          try {
+            data = JSON.parse(response.result);
+          } catch {
+            data = response.result as T;
+          }
+        } else {
+          data = response.result;
+        }
+      } else if (response.content) {
+        // Some versions return content directly
+        data = response.content;
+      }
+
+      if (this.debug) {
+        console.log('[DEBUG] Parsed data:', JSON.stringify(data, null, 2));
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: 'No data found in response',
+        };
+      }
+
       return {
         success: true,
-        data: response.structured_output || response.result,
+        data,
         sessionId: this.sessionId,
       };
     } catch (error) {
+      if (this.debug) {
+        console.log('[DEBUG] Error:', error);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

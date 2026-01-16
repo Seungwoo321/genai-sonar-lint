@@ -49,11 +49,21 @@ export async function generateFixForSingleRule(
       rule.sampleMessages.join('\n')
     );
 
+    // Debug: log explainResult
+    if (!explainResult.success) {
+      console.log(chalk.yellow(`[WARN] explainRule failed: ${explainResult.error}`));
+    }
+
     // Get disable config
     const disableResult = await provider.generateDisableConfig(
       rule.ruleId,
       configContent
     );
+
+    // Debug: log disableResult
+    if (!disableResult.success) {
+      console.log(chalk.yellow(`[WARN] generateDisableConfig failed: ${disableResult.error}`));
+    }
 
     // Generate fix for each location
     const fixes: LocationFix[] = [];
