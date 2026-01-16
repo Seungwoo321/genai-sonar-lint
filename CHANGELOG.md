@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0-beta.2](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.1...v0.2.0-beta.2) (2026-01-16)
+
+### Bug Fixes
+
+* **providers:** improve response parsing for both Claude and Cursor ([6f35c12](https://github.com/Seungwoo321/genai-sonar-lint/commit/6f35c12a54f6d9722ebeec16c81a438e16babab3))
+
 ## [0.2.0-beta.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.0...v0.2.0-beta.1) (2026-01-16)
 
 ### Bug Fixes
