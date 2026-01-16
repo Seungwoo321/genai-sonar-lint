@@ -52,6 +52,8 @@ export async function generateFixForSingleRule(
     // Debug: log explainResult
     if (!explainResult.success) {
       console.log(chalk.yellow(`[WARN] explainRule failed: ${explainResult.error}`));
+    } else if (!explainResult.data?.problemDescription) {
+      console.log(chalk.yellow(`[WARN] explainRule data incomplete: ${JSON.stringify(explainResult.data)}`));
     }
 
     // Get disable config
@@ -118,23 +120,29 @@ export async function generateFixForSingleRule(
 
     spinner.succeed(`Generated ${fixes.length} fixes for ${rule.ruleId}`);
 
+    // Extract explain data with snake_case fallback
+    let explain = {
+      problemDescription: 'Failed to generate explanation',
+      whyProblem: 'N/A',
+      howToFix: 'Check ESLint documentation',
+      priority: 'medium' as 'low' | 'medium' | 'high',
+    };
+
+    if (explainResult.success && explainResult.data) {
+      const data = explainResult.data as Record<string, unknown>;
+      explain = {
+        problemDescription: (data.problemDescription || data.problem_description || 'N/A') as string,
+        whyProblem: (data.whyProblem || data.why_problem || 'N/A') as string,
+        howToFix: (data.howToFix || data.how_to_fix || 'N/A') as string,
+        priority: ((data.priority || 'medium') as string).toLowerCase() as 'low' | 'medium' | 'high',
+      };
+    }
+
     return {
       ruleId: rule.ruleId,
       count: fixes.length,
       severity: rule.severity,
-      explain: explainResult.success && explainResult.data
-        ? {
-            problemDescription: explainResult.data.problemDescription,
-            whyProblem: explainResult.data.whyProblem,
-            howToFix: explainResult.data.howToFix,
-            priority: explainResult.data.priority as 'low' | 'medium' | 'high',
-          }
-        : {
-            problemDescription: 'Failed to generate explanation',
-            whyProblem: 'N/A',
-            howToFix: 'Check ESLint documentation',
-            priority: 'medium',
-          },
+      explain,
       disableConfig: disableResult.success && disableResult.data
         ? disableResult.data
         : { modifiedConfig: '', diffDescription: 'Failed to generate' },
