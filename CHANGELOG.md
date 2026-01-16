@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0-beta.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.0...v0.2.0-beta.1) (2026-01-16)
+
+### Bug Fixes
+
+* improve AI response parsing and add debug logging ([36d4f83](https://github.com/Seungwoo321/genai-sonar-lint/commit/36d4f8380872321fcadf8d9e15d433f494002c4a))
+
 ## 0.2.0-beta.0 (2026-01-16)
 
 ### Features
