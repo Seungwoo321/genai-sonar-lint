@@ -80,18 +80,29 @@ export async function generateFixForSingleRule(
       if (fixResult.success && fixResult.data) {
         const { startLine: fixStart, endLine: fixEnd, fixedCode, explanation } = fixResult.data;
 
-        // Get original code
-        const originalLines = lines.slice(fixStart - 1, fixEnd);
-        const original = originalLines.join('\n');
+        // Validate fix data
+        if (
+          typeof fixStart === 'number' &&
+          typeof fixEnd === 'number' &&
+          fixStart > 0 &&
+          fixEnd >= fixStart &&
+          fixEnd <= lines.length &&
+          typeof fixedCode === 'string' &&
+          fixedCode.length > 0
+        ) {
+          // Get original code
+          const originalLines = lines.slice(fixStart - 1, fixEnd);
+          const original = originalLines.join('\n');
 
-        fixes.push({
-          file: location.fileFull,
-          startLine: fixStart,
-          endLine: fixEnd,
-          original,
-          fixed: fixedCode,
-          explanation,
-        });
+          fixes.push({
+            file: location.fileFull,
+            startLine: fixStart,
+            endLine: fixEnd,
+            original,
+            fixed: fixedCode,
+            explanation: explanation || 'No explanation provided',
+          });
+        }
       }
     }
 
@@ -144,10 +155,16 @@ export async function processRuleInteractive(
     switch (action.toLowerCase()) {
       case 'f': {
         // Apply fixes
+        if (ruleFix.fixes.length === 0) {
+          console.log(chalk.yellow('\nNo fixes available to apply'));
+          continue;
+        }
+
         console.log(chalk.cyan(`\nApply fixes (${ruleFix.fixes.length} available):`));
         for (let j = 0; j < ruleFix.fixes.length; j++) {
           const fix = ruleFix.fixes[j];
-          console.log(`  ${j + 1}) ${fix.file.split('/').pop()}:${fix.startLine}`);
+          const fileName = fix.file?.split('/').pop() ?? 'unknown';
+          console.log(`  ${j + 1}) ${fileName}:${fix.startLine ?? '?'}`);
         }
 
         const selection = await prompt("Enter numbers (comma-separated), 'a' for all, 'c' to cancel: ");
@@ -164,6 +181,11 @@ export async function processRuleInteractive(
         for (const idx of indices) {
           if (idx >= 0 && idx < ruleFix.fixes.length) {
             const fix = ruleFix.fixes[idx];
+            // Check if fix has required data
+            if (!fix.original || !fix.fixed) {
+              console.log(chalk.yellow(`⚠️  Fix data incomplete, skipping: ${fix.file?.split('/').pop() ?? 'unknown'}`));
+              continue;
+            }
             if (applyFix(fix)) {
               console.log(chalk.green(`✅ Applied: ${fix.file.split('/').pop()}`));
             } else {
