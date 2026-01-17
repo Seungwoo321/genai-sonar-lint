@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0-beta.5](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.4...v0.2.0-beta.5) (2026-01-17)
+
+### Features
+
+* **analyze:** enhance error message with issue link ([c12c4db](https://github.com/Seungwoo321/genai-sonar-lint/commit/c12c4db51713e201fcce30ec769d3a00402151dc))
+* **commands:** add models command ([8b740f4](https://github.com/Seungwoo321/genai-sonar-lint/commit/8b740f41aacf3d6ade6ca1de83841bd7e11af9ad))
+* **cursor:** update CLI command and improve login ([2030811](https://github.com/Seungwoo321/genai-sonar-lint/commit/20308118e434cdbcc5d911d9db67071346481cff))
+
+### Documentation
+
+* update CLI references and add new sections ([3fc6ea4](https://github.com/Seungwoo321/genai-sonar-lint/commit/3fc6ea4b84762e0c3e9f80d6cba20d77ff50b1e8))
+
 ## [0.2.0-beta.4](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.2.0-beta.3...v0.2.0-beta.4) (2026-01-16)
 
 ### Bug Fixes
