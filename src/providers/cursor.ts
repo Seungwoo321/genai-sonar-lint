@@ -16,14 +16,14 @@ export class CursorCLIProvider implements AIProvider {
   private debug: boolean;
 
   constructor(options?: ProviderOptions) {
-    this.model = options?.model || 'gemini-3-flash';
-    this.timeout = options?.timeout || 60000;
+    this.model = options?.model || 'claude-4.5-sonnet';
+    this.timeout = options?.timeout || 120000;
     this.debug = options?.debug || false;
   }
 
   async isAvailable(): Promise<boolean> {
     try {
-      await execAsync('which cursor');
+      await execAsync('which agent');
       return true;
     } catch {
       return false;
@@ -31,21 +31,29 @@ export class CursorCLIProvider implements AIProvider {
   }
 
   async login(): Promise<void> {
-    console.log('Logging in to Cursor...');
-    await execAsync('cursor agent login', { timeout: 60000 });
+    console.log('Logging in to Cursor Agent...');
+    const { spawn } = await import('child_process');
+    return new Promise((resolve, reject) => {
+      const proc = spawn('agent', ['login'], { stdio: 'inherit' });
+      proc.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Login failed with code ${code}`));
+      });
+      proc.on('error', reject);
+    });
   }
 
   async status(): Promise<ProviderStatus> {
     try {
-      const { stdout } = await execAsync('cursor agent status', { timeout: 10000 });
+      const { stdout } = await execAsync('agent --version', { timeout: 10000 });
       return {
         available: true,
-        details: stdout.trim() || 'Cursor CLI is available',
+        details: stdout.trim() || 'Cursor Agent is available',
       };
     } catch {
       return {
         available: false,
-        details: 'Cursor CLI not available. Install it first.',
+        details: 'Cursor Agent not available. Install it first.',
       };
     }
   }
@@ -54,9 +62,17 @@ export class CursorCLIProvider implements AIProvider {
     try {
       const resumeFlag = this.sessionId ? `--resume ${this.sessionId}` : '';
 
-      const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | cursor agent -p --model ${this.model} --output-format json ${resumeFlag}`;
+      const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | agent -p --model ${this.model} --output-format json ${resumeFlag}`;
+
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Command:', cmd.substring(0, 200) + '...');
+      }
 
       const { stdout } = await execAsync(cmd, { timeout: this.timeout });
+
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Raw response:', stdout.substring(0, 500));
+      }
 
       const response = JSON.parse(stdout);
 
@@ -65,14 +81,58 @@ export class CursorCLIProvider implements AIProvider {
         this.sessionId = response.session_id;
       }
 
-      // Parse result from JSON string if needed
-      let data = response.result;
-      if (typeof data === 'string') {
-        try {
-          data = JSON.parse(data);
-        } catch {
-          // Keep as string if not valid JSON
+      // Helper to strip markdown code blocks and parse JSON
+      const parseJsonString = (str: string): T | undefined => {
+        // Strip markdown code blocks (```json ... ``` or ``` ... ```)
+        let cleaned = str.trim();
+        const codeBlockMatch = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+        if (codeBlockMatch) {
+          cleaned = codeBlockMatch[1].trim();
         }
+        try {
+          return JSON.parse(cleaned);
+        } catch {
+          return undefined;
+        }
+      };
+
+      // Try multiple possible response structures
+      let data: T | undefined;
+
+      if (response.structured_output) {
+        data = response.structured_output;
+      } else if (response.result) {
+        // result might be a JSON string (possibly with markdown)
+        if (typeof response.result === 'string') {
+          data = parseJsonString(response.result);
+        } else {
+          data = response.result;
+        }
+      } else if (response.content) {
+        // Some versions return content directly
+        if (typeof response.content === 'string') {
+          data = parseJsonString(response.content);
+        } else {
+          data = response.content;
+        }
+      } else if (response.message) {
+        // Try parsing message as JSON
+        if (typeof response.message === 'string') {
+          data = parseJsonString(response.message);
+        } else {
+          data = response.message;
+        }
+      }
+
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Parsed data:', JSON.stringify(data, null, 2));
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: 'No data found in response',
+        };
       }
 
       return {
@@ -81,6 +141,9 @@ export class CursorCLIProvider implements AIProvider {
         sessionId: this.sessionId,
       };
     } catch (error) {
+      if (this.debug) {
+        console.log('[DEBUG] Cursor Error:', error);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
