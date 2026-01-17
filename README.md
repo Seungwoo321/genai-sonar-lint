@@ -51,7 +51,7 @@ flowchart TD
 You need at least one of these AI CLI tools installed:
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) - Anthropic's official CLI
-- [Cursor CLI](https://www.cursor.com/) - Cursor's agent CLI
+- [Cursor Agent CLI](https://www.cursor.com/) - Cursor's agent CLI (command: `agent`)
 
 ## Installation
 
@@ -71,11 +71,11 @@ npx genai-sonar-lint analyze src/
 # Using Claude Code (default)
 genai-sonar-lint analyze src/
 
-# Using Cursor CLI
+# Using Cursor Agent
 genai-sonar-lint analyze src/ -p cursor-cli
 
-# With specific model (Cursor only)
-genai-sonar-lint analyze src/ -p cursor-cli -m claude-3.5-sonnet
+# With specific model
+genai-sonar-lint analyze src/ -p cursor-cli -m claude-4.5-sonnet
 
 # Non-interactive mode (just show summary)
 genai-sonar-lint analyze src/ --non-interactive
@@ -94,12 +94,32 @@ genai-sonar-lint analyze src/ -o report.json
 genai-sonar-lint fix src/
 ```
 
+### Authentication
+
+```bash
+# Login to Cursor Agent
+genai-sonar-lint login cursor-cli
+
+# Setup Claude token
+genai-sonar-lint login claude-code
+```
+
 ### Check Status
 
 ```bash
 # Check ESLint config and provider availability
 genai-sonar-lint status
 genai-sonar-lint status -p cursor-cli
+```
+
+### List Supported Models
+
+```bash
+# List models for Cursor Agent
+genai-sonar-lint models cursor-cli
+
+# List models for Claude Code
+genai-sonar-lint models claude-code
 ```
 
 ## Interactive Actions
@@ -120,7 +140,7 @@ After selecting a rule and generating AI fixes, you'll see an interactive menu:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-p, --provider <provider>` | AI provider (claude-code or cursor-cli) | `claude-code` |
-| `-m, --model <model>` | Model to use (Cursor CLI only) | - |
+| `-m, --model <model>` | Model to use | `claude-4.5-sonnet` (Cursor) / `haiku` (Claude) |
 | `-o, --output <file>` | Save results to JSON file | - |
 | `-r, --raw` | Output raw ESLint results | `false` |
 | `-n, --non-interactive` | Run without interactive mode | `false` |
@@ -202,36 +222,6 @@ Enter rule number to process, or [q] to quit:
   [q] Quit     - Exit                            [deterministic]
 ────────────────────────────────────────────────────────────────
 > f
-```
-
-## Programmatic Usage
-
-```typescript
-import {
-  createProvider,
-  runESLint,
-  parseESLintResult,
-  applyFix,
-} from 'genai-sonar-lint';
-
-// Create a provider
-const provider = createProvider('claude-code', { debug: false });
-
-// Check availability
-const isAvailable = await provider.isAvailable();
-
-// Run ESLint
-const results = await runESLint('src/', process.cwd());
-const parsed = parseESLintResult(results);
-
-// Generate fix for a rule
-const explanation = await provider.explainRule(
-  'sonarjs/no-duplicate-string',
-  'const x = "hello"; const y = "hello";',
-  'Duplicate string literal'
-);
-
-console.log(explanation.data?.howToFix);
 ```
 
 ## Supported ESLint Rules
