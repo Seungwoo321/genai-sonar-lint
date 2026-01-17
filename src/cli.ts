@@ -8,6 +8,7 @@ import { analyzeCommand } from './commands/analyze.js';
 import { fixCommand } from './commands/fix.js';
 import { loginCommand } from './commands/login.js';
 import { statusCommand } from './commands/status.js';
+import { modelsCommand } from './commands/models.js';
 
 const program = new Command();
 
@@ -47,6 +48,12 @@ program
   .option('-p, --provider <provider>', 'AI provider to check')
   .action(statusCommand);
 
+// Models command: genai-sonar-lint models <provider>
+program
+  .command('models <provider>')
+  .description('List supported models for a provider')
+  .action(modelsCommand);
+
 // Help examples
 program.addHelpText(
   'after',
@@ -59,8 +66,9 @@ Examples:
 
   $ genai-sonar-lint fix src/                # Auto-fix with eslint --fix
   $ genai-sonar-lint login claude-code       # Login to Claude Code
-  $ genai-sonar-lint login cursor-cli        # Login to Cursor CLI
+  $ genai-sonar-lint login cursor-cli        # Login to Cursor Agent
   $ genai-sonar-lint status                  # Check configuration
+  $ genai-sonar-lint models cursor-cli       # List supported models
 
 Interactive actions:
   [f] Fix      - Apply AI-generated fix
