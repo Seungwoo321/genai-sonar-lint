@@ -104,6 +104,10 @@ export async function analyzeCommand(
   if (!isAvailable) {
     console.error(chalk.red(`\nProvider not available: ${options.provider}`));
     console.error('Make sure the CLI is installed and in your PATH.');
+    console.error('');
+    console.error('If this issue persists, please report it at:');
+    console.error('  https://github.com/Seungwoo321/genai-sonar-lint/issues');
+    console.error('');
     process.exit(1);
   }
 
