@@ -70,20 +70,22 @@ export class ClaudeCodeProvider implements AIProvider {
     prompt: string,
     schema: object
   ): Promise<AIResponse<T>> {
-    // Create temp files for prompt and schema to avoid shell escaping issues
+    // Create temp file for prompt to avoid shell escaping issues
     const timestamp = Date.now();
     const promptFile = join(tmpdir(), `genai-sonar-lint-prompt-${timestamp}.txt`);
-    const schemaFile = join(tmpdir(), `genai-sonar-lint-schema-${timestamp}.json`);
 
     try {
-      // Write prompt and schema to temp files
+      // Write prompt to temp file
       writeFileSync(promptFile, prompt, 'utf8');
-      writeFileSync(schemaFile, JSON.stringify(schema), 'utf8');
+
+      // Escape schema JSON for shell (single quotes with escaped single quotes inside)
+      const schemaJson = JSON.stringify(schema);
+      const escapedSchema = schemaJson.replace(/'/g, "'\\''");
 
       const resumeFlag = this.sessionId ? `--resume ${this.sessionId}` : '';
 
-      // Use cat to pipe file content instead of echo (more reliable for large content)
-      const cmd = `cat "${promptFile}" | claude -p --model ${this.model} --output-format json --json-schema "$(cat "${schemaFile}")" ${resumeFlag}`;
+      // Use cat to pipe file content and properly escaped schema
+      const cmd = `cat "${promptFile}" | claude -p --model ${this.model} --output-format json --json-schema '${escapedSchema}' ${resumeFlag}`;
 
       if (this.debug) {
         console.log('[DEBUG] Claude Command:', cmd.substring(0, 200) + '...');
@@ -105,9 +107,21 @@ export class ClaudeCodeProvider implements AIProvider {
 
       const response = JSON.parse(stdout);
 
+      if (this.debug) {
+        console.log('[DEBUG] Response keys:', Object.keys(response));
+      }
+
       // Save session ID for subsequent calls
       if (response.session_id) {
         this.sessionId = response.session_id;
+      }
+
+      // Check for error response
+      if (response.is_error || response.error) {
+        return {
+          success: false,
+          error: response.error || response.message || 'Unknown error from Claude',
+        };
       }
 
       // Helper to strip markdown code blocks and parse JSON
@@ -125,39 +139,64 @@ export class ClaudeCodeProvider implements AIProvider {
         }
       };
 
+      // Helper to check if object has expected schema fields
+      const hasSchemaFields = (obj: unknown): obj is T => {
+        if (!obj || typeof obj !== 'object') return false;
+        const schemaProps = (schema as { properties?: Record<string, unknown> }).properties;
+        if (!schemaProps) return false;
+        // Check if at least one expected field exists
+        return Object.keys(schemaProps).some(key => key in (obj as Record<string, unknown>));
+      };
+
       // Try multiple possible response structures
       let data: T | undefined;
 
+      // 1. Check structured_output first (Claude Code with --json-schema)
       if (response.structured_output) {
         data = response.structured_output;
-      } else if (response.result) {
-        // result might be a JSON string (possibly with markdown)
+      }
+      // 2. Check if response itself contains schema fields (direct output)
+      else if (hasSchemaFields(response)) {
+        // Filter out metadata fields and use the response directly
+        const responseObj = response as Record<string, unknown>;
+        const { session_id, cost, duration_ms, num_turns, ...rest } = responseObj;
+        if (hasSchemaFields(rest)) {
+          data = rest as T;
+        }
+      }
+      // 3. Check result field
+      else if (response.result) {
         if (typeof response.result === 'string') {
           data = parseJsonString(response.result);
-        } else {
+        } else if (hasSchemaFields(response.result)) {
           data = response.result;
         }
-      } else if (response.content) {
-        // Some versions return content directly
+      }
+      // 4. Check content field
+      else if (response.content) {
         if (typeof response.content === 'string') {
           data = parseJsonString(response.content);
-        } else {
+        } else if (hasSchemaFields(response.content)) {
           data = response.content;
         }
-      } else if (response.message) {
-        // Try parsing message as JSON
+      }
+      // 5. Check message field
+      else if (response.message) {
         if (typeof response.message === 'string') {
           data = parseJsonString(response.message);
-        } else {
+        } else if (hasSchemaFields(response.message)) {
           data = response.message;
         }
       }
 
       if (this.debug) {
-        console.log('[DEBUG] Parsed data:', JSON.stringify(data, null, 2));
+        console.log('[DEBUG] Parsed data:', data ? JSON.stringify(data, null, 2).substring(0, 500) : 'undefined');
       }
 
       if (!data) {
+        if (this.debug) {
+          console.log('[DEBUG] Full response for debugging:', JSON.stringify(response, null, 2).substring(0, 2000));
+        }
         return {
           success: false,
           error: 'No data found in response',
@@ -178,13 +217,10 @@ export class ClaudeCodeProvider implements AIProvider {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     } finally {
-      // Clean up temp files
+      // Clean up temp file
       try {
         if (existsSync(promptFile)) {
           unlinkSync(promptFile);
-        }
-        if (existsSync(schemaFile)) {
-          unlinkSync(schemaFile);
         }
       } catch {
         // Ignore cleanup errors
