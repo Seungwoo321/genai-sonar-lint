@@ -4,18 +4,26 @@
  */
 
 import { Command } from 'commander';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { analyzeCommand } from './commands/analyze.js';
 import { fixCommand } from './commands/fix.js';
 import { loginCommand } from './commands/login.js';
 import { statusCommand } from './commands/status.js';
 import { modelsCommand } from './commands/models.js';
 
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+
 const program = new Command();
 
 program
   .name('genai-sonar-lint')
   .description('AI-powered ESLint/SonarJS analyzer and fixer using Claude Code or Cursor CLI')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 // Analyze command: genai-sonar-lint analyze <path>
 program
