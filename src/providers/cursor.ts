@@ -4,9 +4,15 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { AIProvider, AIResponse, ProviderOptions, ProviderStatus } from './types.js';
 
 const execAsync = promisify(exec);
+
+// Max buffer size: 50MB
+const MAX_BUFFER = 50 * 1024 * 1024;
 
 export class CursorCLIProvider implements AIProvider {
   readonly name = 'cursor-cli' as const;
@@ -59,19 +65,35 @@ export class CursorCLIProvider implements AIProvider {
   }
 
   private async callCursor<T>(prompt: string): Promise<AIResponse<T>> {
+    // Create temp file for prompt to avoid shell escaping issues and buffer limits
+    const timestamp = Date.now();
+    const promptFile = join(tmpdir(), `genai-sonar-lint-prompt-${timestamp}.txt`);
+
     try {
+      // Write prompt to temp file
+      writeFileSync(promptFile, prompt, 'utf8');
+
       const resumeFlag = this.sessionId ? `--resume ${this.sessionId}` : '';
 
-      const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | agent -p --model ${this.model} --output-format json ${resumeFlag}`;
+      // Use cat to pipe file content instead of echo (more reliable for large content)
+      const cmd = `cat "${promptFile}" | agent -p --model ${this.model} --output-format json ${resumeFlag}`;
 
       if (this.debug) {
         console.log('[DEBUG] Cursor Command:', cmd.substring(0, 200) + '...');
+        console.log('[DEBUG] Prompt length:', prompt.length, 'bytes');
       }
 
-      const { stdout } = await execAsync(cmd, { timeout: this.timeout });
+      const { stdout } = await execAsync(cmd, {
+        timeout: this.timeout,
+        maxBuffer: MAX_BUFFER
+      });
 
       if (this.debug) {
-        console.log('[DEBUG] Cursor Raw response:', stdout.substring(0, 500));
+        console.log('[DEBUG] Cursor Response length:', stdout.length, 'bytes');
+        console.log('[DEBUG] Cursor Raw response (first 1000 chars):', stdout.substring(0, 1000));
+        if (stdout.length > 1000) {
+          console.log('[DEBUG] Cursor Raw response (last 500 chars):', stdout.substring(stdout.length - 500));
+        }
       }
 
       const response = JSON.parse(stdout);
@@ -148,6 +170,15 @@ export class CursorCLIProvider implements AIProvider {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      // Clean up temp file
+      try {
+        if (existsSync(promptFile)) {
+          unlinkSync(promptFile);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   }
 
