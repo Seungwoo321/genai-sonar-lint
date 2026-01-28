@@ -82,10 +82,9 @@ export class ClaudeCodeProvider implements AIProvider {
       const schemaJson = JSON.stringify(schema);
       const escapedSchema = schemaJson.replace(/'/g, "'\\''");
 
-      const resumeFlag = this.sessionId ? `--resume ${this.sessionId}` : '';
-
-      // Use cat to pipe file content and properly escaped schema
-      const cmd = `cat "${promptFile}" | claude -p --model ${this.model} --output-format json --json-schema '${escapedSchema}' ${resumeFlag}`;
+      // Note: Do NOT use --resume with --json-schema as it causes schema to be ignored
+      // Each call uses a fresh session for reliable structured output
+      const cmd = `cat "${promptFile}" | claude -p --model ${this.model} --output-format json --json-schema '${escapedSchema}'`;
 
       if (this.debug) {
         console.log('[DEBUG] Claude Command:', cmd.substring(0, 200) + '...');
@@ -100,9 +99,6 @@ export class ClaudeCodeProvider implements AIProvider {
       if (this.debug) {
         console.log('[DEBUG] Claude Response length:', stdout.length, 'bytes');
         console.log('[DEBUG] Claude Raw response (first 1000 chars):', stdout.substring(0, 1000));
-        if (stdout.length > 1000) {
-          console.log('[DEBUG] Claude Raw response (last 500 chars):', stdout.substring(stdout.length - 500));
-        }
       }
 
       const response = JSON.parse(stdout);
@@ -124,89 +120,57 @@ export class ClaudeCodeProvider implements AIProvider {
         };
       }
 
-      // Helper to strip markdown code blocks and parse JSON
-      const parseJsonString = (str: string): T | undefined => {
-        // Strip markdown code blocks (```json ... ``` or ``` ... ```)
-        let cleaned = str.trim();
-        const codeBlockMatch = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-        if (codeBlockMatch) {
-          cleaned = codeBlockMatch[1].trim();
-        }
-        try {
-          return JSON.parse(cleaned);
-        } catch {
-          return undefined;
-        }
-      };
+      // Get expected field names from schema for validation
+      const schemaProps = (schema as { properties?: Record<string, unknown> }).properties || {};
+      const expectedFields = Object.keys(schemaProps);
 
       // Helper to check if object has expected schema fields
-      const hasSchemaFields = (obj: unknown): obj is T => {
+      const hasSchemaFields = (obj: unknown): boolean => {
         if (!obj || typeof obj !== 'object') return false;
-        const schemaProps = (schema as { properties?: Record<string, unknown> }).properties;
-        if (!schemaProps) return false;
-        // Check if at least one expected field exists
-        return Object.keys(schemaProps).some(key => key in (obj as Record<string, unknown>));
+        return expectedFields.some(key => key in (obj as Record<string, unknown>));
       };
 
-      // Try multiple possible response structures
-      let data: T | undefined;
-
-      // 1. Check structured_output first (Claude Code with --json-schema)
-      if (response.structured_output) {
-        data = response.structured_output;
-      }
-      // 2. Check if response itself contains schema fields (direct output)
-      else if (hasSchemaFields(response)) {
-        // Filter out metadata fields and use the response directly
-        const responseObj = response as Record<string, unknown>;
-        const { session_id, cost, duration_ms, num_turns, ...rest } = responseObj;
-        if (hasSchemaFields(rest)) {
-          data = rest as T;
-        }
-      }
-      // 3. Check result field
-      else if (response.result) {
-        if (typeof response.result === 'string') {
-          data = parseJsonString(response.result);
-        } else if (hasSchemaFields(response.result)) {
-          data = response.result;
-        }
-      }
-      // 4. Check content field
-      else if (response.content) {
-        if (typeof response.content === 'string') {
-          data = parseJsonString(response.content);
-        } else if (hasSchemaFields(response.content)) {
-          data = response.content;
-        }
-      }
-      // 5. Check message field
-      else if (response.message) {
-        if (typeof response.message === 'string') {
-          data = parseJsonString(response.message);
-        } else if (hasSchemaFields(response.message)) {
-          data = response.message;
-        }
-      }
-
-      if (this.debug) {
-        console.log('[DEBUG] Parsed data:', data ? JSON.stringify(data, null, 2).substring(0, 500) : 'undefined');
-      }
-
-      if (!data) {
+      // Primary: Use structured_output (when --json-schema works correctly)
+      if (response.structured_output && hasSchemaFields(response.structured_output)) {
         if (this.debug) {
-          console.log('[DEBUG] Full response for debugging:', JSON.stringify(response, null, 2).substring(0, 2000));
+          console.log('[DEBUG] Using structured_output');
         }
         return {
-          success: false,
-          error: 'No data found in response',
+          success: true,
+          data: response.structured_output as T,
+          sessionId: this.sessionId,
         };
       }
 
+      // Fallback: Parse from result field (if --json-schema didn't work)
+      if (response.result !== undefined) {
+        let data: T | undefined;
+
+        if (typeof response.result === 'object' && hasSchemaFields(response.result)) {
+          data = response.result as T;
+        } else if (typeof response.result === 'string' && response.result.trim()) {
+          // Try to extract JSON from string (may contain markdown code blocks)
+          const parsed = this.extractJsonFromString(response.result);
+          if (parsed && hasSchemaFields(parsed)) {
+            data = parsed as T;
+          }
+        }
+
+        if (data) {
+          if (this.debug) {
+            console.log('[DEBUG] Using result field (fallback)');
+          }
+          return {
+            success: true,
+            data,
+            sessionId: this.sessionId,
+          };
+        }
+      }
+
       return {
-        success: true,
-        data,
-        sessionId: this.sessionId,
+        success: false,
+        error: 'No data found in response',
       };
     } catch (error) {
       if (this.debug) {
@@ -225,6 +189,67 @@ export class ClaudeCodeProvider implements AIProvider {
       } catch {
         // Ignore cleanup errors
       }
+    }
+  }
+
+  /**
+   * Extract JSON object from a string that may contain markdown code blocks
+   */
+  private extractJsonFromString(str: string): unknown {
+    if (!str || typeof str !== 'string') return undefined;
+
+    let cleaned = str.trim();
+
+    // Remove markdown code block markers
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+
+    // Find the first balanced JSON object
+    const startIndex = cleaned.indexOf('{');
+    if (startIndex === -1) return undefined;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let endIndex = -1;
+
+    for (let i = startIndex; i < cleaned.length; i++) {
+      const char = cleaned[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+
+      if (char === '"' && !escape) {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === '{') depth++;
+        else if (char === '}') {
+          depth--;
+          if (depth === 0) {
+            endIndex = i;
+            break;
+          }
+        }
+      }
+    }
+
+    if (endIndex === -1) return undefined;
+
+    const jsonStr = cleaned.substring(startIndex, endIndex + 1);
+
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      return undefined;
     }
   }
 
@@ -284,9 +309,23 @@ ${sampleMessages}
 ${codeContext}
 
 ## 중요 지침
-1. 수정이 필요한 코드 범위를 정확히 파악하세요 (시작 라인 ~ 끝 라인)
-2. start_line과 end_line은 교체할 범위 (포함)
-3. fixed_code는 그 범위를 대체할 새 코드 (들여쓰기 유지)`;
+1. startLine과 endLine: 삭제하고 교체할 원본 코드의 정확한 라인 범위 (1-indexed, 포함)
+2. fixedCode: startLine부터 endLine까지의 코드를 완전히 대체할 새 코드
+   - 원본 코드를 복사하지 말고, 수정된 코드만 작성
+   - 들여쓰기(공백/탭)를 원본과 동일하게 유지
+   - 여러 줄인 경우 줄바꿈(\\n) 포함
+
+## 예시
+원본 (라인 10-12):
+  const x = a ? (b ? 1 : 2) : 3;
+
+올바른 응답:
+  startLine: 10
+  endLine: 10
+  fixedCode: "  let result;\\n  if (a) {\\n    result = b ? 1 : 2;\\n  } else {\\n    result = 3;\\n  }"
+
+잘못된 응답 (원본 포함하면 안됨):
+  fixedCode: "const x = a ? (b ? 1 : 2) : 3;\\n  let result;\\n  ..."  // 원본이 중복됨`;
 
     const schema = {
       type: 'object',
