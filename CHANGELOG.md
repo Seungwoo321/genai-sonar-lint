@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.6.2](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.2-beta.0...v0.6.2) (2026-01-28)
+
 ## [0.6.2-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.1...v0.6.2-beta.0) (2026-01-28)
 
 ### Refactoring
