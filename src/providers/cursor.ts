@@ -64,6 +64,13 @@ export class CursorCLIProvider implements AIProvider {
     }
   }
 
+  resetSession(): void {
+    this.sessionId = undefined;
+    if (this.debug) {
+      console.log('[DEBUG] Cursor session reset');
+    }
+  }
+
   private async callCursor<T>(prompt: string): Promise<AIResponse<T>> {
     // Create temp file for prompt to avoid shell escaping issues and buffer limits
     const timestamp = Date.now();

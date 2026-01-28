@@ -17,7 +17,8 @@ import {
   generateFixForSingleRule,
   processRuleInteractive,
 } from '../ui/interactive.js';
-import type { AnalyzeOptions, ParsedResult } from '../types/index.js';
+import { applyFix } from '../eslint/fixer.js';
+import type { AnalyzeOptions, ParsedResult, ParsedRule } from '../types/index.js';
 
 /**
  * Run ESLint and parse results
@@ -104,6 +105,171 @@ export async function analyzeCommand(
     return;
   }
 
+  // Auto-fix mode - automatically fix all issues using AI (file by file)
+  if (options.autoFix) {
+    const provider = createProvider(options.provider, {
+      model: options.model,
+      debug: options.debug,
+    });
+
+    const isAvailable = await provider.isAvailable();
+    if (!isAvailable) {
+      console.error(chalk.red(`\nProvider not available: ${options.provider}`));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan.bold('\n🤖 Auto-fix mode enabled\n'));
+
+    let totalFixed = 0;
+    let totalSkipped = 0;
+    let iteration = 1;
+
+    // Track skipped rules to prevent infinite loops
+    // Key: "file:ruleId", Value: number of skip attempts
+    const skippedRules = new Map<string, number>();
+    const MAX_SKIP_ATTEMPTS = 2;
+
+    // Track current file for per-file session management
+    let currentFile: string | null = null;
+
+    while (true) {
+      console.log(chalk.cyan(`\n[Iteration ${iteration}] Running ESLint...\n`));
+
+      const parsed = await runAndParseESLint(targetPath, projectRoot);
+      if (!parsed) {
+        console.error(chalk.red('Failed to run ESLint'));
+        process.exit(1);
+      }
+
+      // Check for parsing errors
+      if (hasParsingErrors(parsed)) {
+        console.error(chalk.red.bold('\n⚠️  Parsing errors found! Cannot continue auto-fix.'));
+        for (const error of getParsingErrors(parsed)) {
+          console.error(chalk.dim(`  ${error.file}:${error.line} - ${error.message}`));
+        }
+        process.exit(1);
+      }
+
+      // No issues - done!
+      if (parsed.summary.totalIssues === 0) {
+        console.log(chalk.green.bold('\n✅ All issues fixed!\n'));
+        console.log(chalk.cyan(`Total fixed: ${totalFixed}`));
+        console.log(chalk.yellow(`Total skipped: ${totalSkipped}`));
+        return;
+      }
+
+      displaySummary(parsed);
+
+      // Run eslint --fix first for auto-fixable issues
+      if (parsed.summary.fixable > 0) {
+        console.log(chalk.yellow(`\n📦 Running eslint --fix for ${parsed.summary.fixable} auto-fixable issues...`));
+        const spinner = ora('Running eslint --fix...').start();
+        try {
+          await runESLintFix(targetPath, projectRoot);
+          spinner.succeed('Auto-fix completed');
+          iteration++;
+          continue;
+        } catch (error) {
+          spinner.fail('Auto-fix failed');
+        }
+      }
+
+      // Get manual-fix rules (non-auto-fixable)
+      const manualRules = parsed.rules.filter((r) => !r.autoFixable && r.ruleId !== null);
+
+      if (manualRules.length === 0) {
+        console.log(chalk.green.bold('\n✅ No more manual-fix rules remaining!\n'));
+        console.log(chalk.cyan(`Total fixed: ${totalFixed}`));
+        console.log(chalk.yellow(`Total skipped: ${totalSkipped}`));
+        return;
+      }
+
+      // Group rules by file for file-by-file processing
+      const fileRuleMap = new Map<string, ParsedRule[]>();
+      for (const rule of manualRules) {
+        for (const loc of rule.locations) {
+          const existing = fileRuleMap.get(loc.fileFull) || [];
+          // Add rule if not already added for this file
+          if (!existing.find(r => r.ruleId === rule.ruleId)) {
+            existing.push(rule);
+          }
+          fileRuleMap.set(loc.fileFull, existing);
+        }
+      }
+
+      // Find a rule that hasn't been skipped too many times
+      let targetFile: string | null = null;
+      let targetRule: ParsedRule | null = null;
+
+      for (const [file, rules] of fileRuleMap.entries()) {
+        for (const rule of rules) {
+          const key = `${file}:${rule.ruleId}`;
+          const skipCount = skippedRules.get(key) || 0;
+          if (skipCount < MAX_SKIP_ATTEMPTS) {
+            targetFile = file;
+            targetRule = rule;
+            break;
+          }
+        }
+        if (targetRule) break;
+      }
+
+      // All rules have been skipped too many times
+      if (!targetFile || !targetRule) {
+        console.log(chalk.yellow.bold('\n⚠️  All remaining rules failed to fix after multiple attempts.\n'));
+        console.log(chalk.cyan(`Total fixed: ${totalFixed}`));
+        console.log(chalk.yellow(`Total skipped: ${totalSkipped}`));
+        console.log(chalk.dim('\nRemaining issues require manual intervention.'));
+        return;
+      }
+
+      // Reset session when switching to a different file
+      if (currentFile !== targetFile) {
+        if (currentFile !== null) {
+          console.log(chalk.dim(`  [Session] Switching file: ${currentFile.split('/').pop()} → ${targetFile.split('/').pop()}`));
+          provider.resetSession();
+        }
+        currentFile = targetFile;
+      }
+
+      console.log(chalk.cyan(`\n[Auto-fix] Processing: ${targetFile.split('/').pop()}`));
+      console.log(chalk.dim(`  Rule: ${targetRule.ruleId} (${targetRule.count} issues)`));
+
+      // Generate fix for this rule
+      const ruleFix = await generateFixForSingleRule(targetRule, provider, configPath);
+      const skipKey = `${targetFile}:${targetRule.ruleId}`;
+
+      if (!ruleFix || ruleFix.fixes.length === 0) {
+        console.log(chalk.yellow(`  ⚠️  No fix generated, skipping rule`));
+        skippedRules.set(skipKey, (skippedRules.get(skipKey) || 0) + 1);
+        totalSkipped++;
+        iteration++;
+        continue;
+      }
+
+      // Apply first fix only (to avoid line number issues)
+      const fix = ruleFix.fixes[0];
+      if (fix.original && fix.fixed) {
+        if (applyFix(fix)) {
+          console.log(chalk.green(`  ✅ Applied fix: ${fix.file.split('/').pop()}:${fix.startLine}`));
+          totalFixed++;
+          // Reset skip count on success since line numbers may have changed
+          skippedRules.delete(skipKey);
+        } else {
+          console.log(chalk.yellow(`  ⚠️  Could not apply fix (original code not found)`));
+          skippedRules.set(skipKey, (skippedRules.get(skipKey) || 0) + 1);
+          totalSkipped++;
+        }
+      } else {
+        console.log(chalk.yellow(`  ⚠️  Fix data incomplete, skipping`));
+        skippedRules.set(skipKey, (skippedRules.get(skipKey) || 0) + 1);
+        totalSkipped++;
+      }
+
+      iteration++;
+    }
+  }
+
   // Check provider availability
   const provider = createProvider(options.provider, {
     model: options.model,
@@ -125,6 +291,9 @@ export async function analyzeCommand(
   // Main Loop: ESLint → Select Rule → AI Fix → Apply → Repeat
   // ═══════════════════════════════════════════════════════════════════
   let iteration = 1;
+
+  // Track current file for per-file session management
+  let currentFile: string | null = null;
 
   while (true) {
     console.log(chalk.cyan.bold(`\n[Iteration ${iteration}] Running ESLint...\n`));
@@ -209,6 +378,17 @@ export async function analyzeCommand(
 
     // Step 8: Generate AI fix for selected rule
     const selectedRule = manualRules[selectedIndex];
+
+    // Reset session when switching to a different file
+    const ruleFile = selectedRule.locations[0]?.fileFull || null;
+    if (ruleFile && currentFile !== ruleFile) {
+      if (currentFile !== null) {
+        console.log(chalk.dim(`[Session] Switching file: ${currentFile.split('/').pop()} → ${ruleFile.split('/').pop()}`));
+        provider.resetSession();
+      }
+      currentFile = ruleFile;
+    }
+
     console.log(chalk.cyan(`\n[AI] Generating fix for ${selectedRule.ruleId}...\n`));
 
     const ruleFix = await generateFixForSingleRule(selectedRule, provider, configPath);
