@@ -74,13 +74,21 @@ export function parseESLintResult(results: ESLintResult[]): ParsedResult {
 
 /**
  * Check if there are parsing errors (syntax errors)
+ * Note: ruleId === null can also be "Unused eslint-disable directive" which is not a parsing error
  */
 export function hasParsingErrors(result: ParsedResult): boolean {
-  return result.rules.some((rule) => rule.ruleId === null);
+  const parsingRule = result.rules.find((rule) => rule.ruleId === null);
+  if (!parsingRule) return false;
+
+  // Check if any message is an actual parsing error (not unused directive)
+  return parsingRule.sampleMessages.some(
+    (msg) => msg.toLowerCase().includes('parsing error') ||
+             msg.toLowerCase().includes('unexpected token')
+  );
 }
 
 /**
- * Get parsing error locations
+ * Get parsing error locations (only actual parsing errors, not unused directives)
  */
 export function getParsingErrors(
   result: ParsedResult
@@ -88,9 +96,16 @@ export function getParsingErrors(
   const parsingRule = result.rules.find((rule) => rule.ruleId === null);
   if (!parsingRule) return [];
 
-  return parsingRule.locations.map((loc, i) => ({
-    file: loc.fileFull,
-    line: loc.line,
-    message: parsingRule.sampleMessages[i] || 'Parsing error',
-  }));
+  // Only return actual parsing errors
+  return parsingRule.locations
+    .map((loc, i) => ({
+      file: loc.fileFull,
+      line: loc.line,
+      message: parsingRule.sampleMessages[i] || '',
+    }))
+    .filter(
+      (item) =>
+        item.message.toLowerCase().includes('parsing error') ||
+        item.message.toLowerCase().includes('unexpected token')
+    );
 }
