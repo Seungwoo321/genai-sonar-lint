@@ -6,6 +6,9 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,6 +20,9 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -30,6 +36,4 @@ jobs:
         run: pnpm build
 
       - name: Publish Initial Beta
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --tag beta --access public
+        run: npm publish --tag beta --access public --provenance
