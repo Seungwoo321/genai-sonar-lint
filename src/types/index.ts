@@ -97,6 +97,7 @@ export interface AnalyzeOptions {
   output?: string;
   raw?: boolean;
   nonInteractive?: boolean;
+  autoFix?: boolean;
   debug?: boolean;
   config?: string;
 }
