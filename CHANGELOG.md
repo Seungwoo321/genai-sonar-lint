@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.2-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.1...v0.6.2-beta.0) (2026-01-28)
+
+### Refactoring
+
+* **providers:** improve Claude API response parsing and error handling ([2e1d433](https://github.com/Seungwoo321/genai-sonar-lint/commit/2e1d433f9d842e2db0598a68c09a94a2f30e8f2c))
+
 ## [0.6.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.1-beta.0...v0.6.1) (2026-01-28)
 
 ## [0.6.1-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.0...v0.6.1-beta.0) (2026-01-28)
