@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.5.0...v0.6.0-beta.0) (2026-01-28)
+
+### Features
+
+* **analyze:** implement AI auto-fix mode with file-by-file processing ([c6da949](https://github.com/Seungwoo321/genai-sonar-lint/commit/c6da949beb53298cb09ccaa8138c0d7f7968ad25))
+* **cli:** add auto-fix option for AI-powered automatic fixing ([4544149](https://github.com/Seungwoo321/genai-sonar-lint/commit/454414927f76aae871ba3d70c3d7b35cb53c598b))
+* **providers:** add session reset for per-file context management ([734ad0e](https://github.com/Seungwoo321/genai-sonar-lint/commit/734ad0ee63cdef55039062c9eaa1e5fe0eb8b736))
+* **types:** add autoFix option to AnalyzeOptions interface ([96f96bd](https://github.com/Seungwoo321/genai-sonar-lint/commit/96f96bd3bc59c1be2ff7562d5553394d9aa535c1))
+
 ## [0.5.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.5.0-beta.1...v0.5.0) (2026-01-28)
 
 ## [0.5.0-beta.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.5.0-beta.0...v0.5.0-beta.1) (2026-01-28)
