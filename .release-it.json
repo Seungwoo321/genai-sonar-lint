@@ -5,7 +5,9 @@
   },
   "npm": {
     "publish": true,
-    "provenance": true
+    "access": "public",
+    "publishArgs": ["--provenance"],
+    "skipChecks": true
   },
   "github": {
     "release": true
