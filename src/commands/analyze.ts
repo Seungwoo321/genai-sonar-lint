@@ -3,7 +3,7 @@
  */
 
 import { resolve } from 'path';
-import { writeFileSync } from 'fs';
+import { writeFileSync, existsSync } from 'fs';
 import chalk from 'chalk';
 import ora from 'ora';
 import { runESLint, runESLintFix } from '../eslint/runner.js';
@@ -59,9 +59,19 @@ export async function analyzeCommand(
   }
 
   // Check ESLint config
-  const configPath = findESLintConfig(projectRoot);
+  let configPath: string | null;
+  if (options.config) {
+    configPath = resolve(projectRoot, options.config);
+    if (!existsSync(configPath)) {
+      console.error(chalk.red(`ESLint config not found: ${configPath}`));
+      process.exit(1);
+    }
+  } else {
+    configPath = findESLintConfig(projectRoot);
+  }
   if (!configPath) {
     console.error(chalk.red('ESLint config not found'));
+    console.error(chalk.dim('Use --config <path> to specify the config file path'));
     process.exit(1);
   }
 
