@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0-beta.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.5.0-beta.0...v0.5.0-beta.1) (2026-01-28)
+
+### Features
+
+* **cursor:** improve large prompt handling with temp files ([a32fafd](https://github.com/Seungwoo321/genai-sonar-lint/commit/a32fafdeea5db5a255e4808e6e5f2bd89eb691d3))
+
 ## [0.5.0-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.4.0...v0.5.0-beta.0) (2026-01-28)
 
 ### Features
