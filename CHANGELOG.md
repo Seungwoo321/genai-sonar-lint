@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.3-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.2...v0.6.3-beta.0) (2026-01-28)
+
+### Bug Fixes
+
+* **eslint:** improve parsing error detection logic ([c5eb996](https://github.com/Seungwoo321/genai-sonar-lint/commit/c5eb996d68cbec6511895cce7ed8cebd3bbad774))
+
+### Refactoring
+
+* **providers:** simplify Claude response parsing and fix schema handling ([6b7f356](https://github.com/Seungwoo321/genai-sonar-lint/commit/6b7f356f7b54ac7f2040002ec47e6a3ffc79aef5))
+
 ## [0.6.2](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.2-beta.0...v0.6.2) (2026-01-28)
 
 ## [0.6.2-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.6.1...v0.6.2-beta.0) (2026-01-28)
