@@ -4,9 +4,15 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { AIProvider, AIResponse, ProviderOptions, ProviderStatus } from './types.js';
 
 const execAsync = promisify(exec);
+
+// Max buffer size: 50MB
+const MAX_BUFFER = 50 * 1024 * 1024;
 
 export class ClaudeCodeProvider implements AIProvider {
   readonly name = 'claude-code' as const;
@@ -64,19 +70,37 @@ export class ClaudeCodeProvider implements AIProvider {
     prompt: string,
     schema: object
   ): Promise<AIResponse<T>> {
+    // Create temp files for prompt and schema to avoid shell escaping issues
+    const timestamp = Date.now();
+    const promptFile = join(tmpdir(), `genai-sonar-lint-prompt-${timestamp}.txt`);
+    const schemaFile = join(tmpdir(), `genai-sonar-lint-schema-${timestamp}.json`);
+
     try {
+      // Write prompt and schema to temp files
+      writeFileSync(promptFile, prompt, 'utf8');
+      writeFileSync(schemaFile, JSON.stringify(schema), 'utf8');
+
       const resumeFlag = this.sessionId ? `--resume ${this.sessionId}` : '';
 
-      const cmd = `echo '${prompt.replace(/'/g, "'\\''")}' | claude -p --model ${this.model} --output-format json --json-schema '${JSON.stringify(schema)}' ${resumeFlag}`;
+      // Use cat to pipe file content instead of echo (more reliable for large content)
+      const cmd = `cat "${promptFile}" | claude -p --model ${this.model} --output-format json --json-schema "$(cat "${schemaFile}")" ${resumeFlag}`;
 
       if (this.debug) {
-        console.log('[DEBUG] Command:', cmd.substring(0, 200) + '...');
+        console.log('[DEBUG] Claude Command:', cmd.substring(0, 200) + '...');
+        console.log('[DEBUG] Prompt length:', prompt.length, 'bytes');
       }
 
-      const { stdout } = await execAsync(cmd, { timeout: this.timeout });
+      const { stdout } = await execAsync(cmd, {
+        timeout: this.timeout,
+        maxBuffer: MAX_BUFFER
+      });
 
       if (this.debug) {
-        console.log('[DEBUG] Raw response:', stdout.substring(0, 500));
+        console.log('[DEBUG] Claude Response length:', stdout.length, 'bytes');
+        console.log('[DEBUG] Claude Raw response (first 1000 chars):', stdout.substring(0, 1000));
+        if (stdout.length > 1000) {
+          console.log('[DEBUG] Claude Raw response (last 500 chars):', stdout.substring(stdout.length - 500));
+        }
       }
 
       const response = JSON.parse(stdout);
@@ -147,12 +171,24 @@ export class ClaudeCodeProvider implements AIProvider {
       };
     } catch (error) {
       if (this.debug) {
-        console.log('[DEBUG] Error:', error);
+        console.log('[DEBUG] Claude Error:', error);
       }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    } finally {
+      // Clean up temp files
+      try {
+        if (existsSync(promptFile)) {
+          unlinkSync(promptFile);
+        }
+        if (existsSync(schemaFile)) {
+          unlinkSync(schemaFile);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
     }
   }
 
