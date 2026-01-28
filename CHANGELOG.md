@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.4.0...v0.5.0-beta.0) (2026-01-28)
+
+### Features
+
+* **cli:** read version from package.json dynamically ([861acc9](https://github.com/Seungwoo321/genai-sonar-lint/commit/861acc90a563defae08e10bc2c14134ce078467f))
+
 ## [0.4.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.4.0-beta.0...v0.4.0) (2026-01-28)
 
 ## [0.4.0-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.3.2-beta.0...v0.4.0-beta.0) (2026-01-28)
