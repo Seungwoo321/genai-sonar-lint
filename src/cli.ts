@@ -34,6 +34,7 @@ program
   .option('-o, --output <file>', 'Save results to JSON file')
   .option('-r, --raw', 'Output raw ESLint results without AI analysis')
   .option('-n, --non-interactive', 'Run without interactive mode')
+  .option('-a, --auto-fix', 'Auto-fix all issues using AI (file by file)')
   .option('-d, --debug', 'Enable debug mode')
   .option('-c, --config <path>', 'ESLint config file path (for monorepo)')
   .action(analyzeCommand);
@@ -73,6 +74,8 @@ Examples:
   $ genai-sonar-lint analyze src/ --raw      # Raw ESLint output only
   $ genai-sonar-lint analyze src/ -o report.json
   $ genai-sonar-lint analyze src/ -c packages/eslint-config/index.js  # Monorepo config
+  $ genai-sonar-lint analyze src/ -a         # AI auto-fix mode (file by file)
+  $ genai-sonar-lint analyze src/ -a -p cursor-cli  # Auto-fix with Cursor CLI
 
   $ genai-sonar-lint fix src/                # Auto-fix with eslint --fix
   $ genai-sonar-lint login claude-code       # Login to Claude Code
