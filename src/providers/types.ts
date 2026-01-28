@@ -42,6 +42,11 @@ export interface AIProvider {
   status(): Promise<ProviderStatus>;
 
   /**
+   * Reset session (for per-file context management)
+   */
+  resetSession(): void;
+
+  /**
    * Generate rule explanation
    */
   explainRule(

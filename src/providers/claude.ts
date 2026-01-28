@@ -53,6 +53,13 @@ export class ClaudeCodeProvider implements AIProvider {
     }
   }
 
+  resetSession(): void {
+    this.sessionId = undefined;
+    if (this.debug) {
+      console.log('[DEBUG] Claude session reset');
+    }
+  }
+
   private async callClaude<T>(
     prompt: string,
     schema: object
