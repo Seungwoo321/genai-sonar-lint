@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.3.2-beta.0...v0.4.0-beta.0) (2026-01-28)
+
+### Features
+
+* **cli:** add custom ESLint config path option for monorepo support ([82935d0](https://github.com/Seungwoo321/genai-sonar-lint/commit/82935d0d8e79419d21517f38fcdda27ac6393232))
+
+### Chores
+
+* **release:** update npm publish configuration ([dce23da](https://github.com/Seungwoo321/genai-sonar-lint/commit/dce23da36f61d5afa69412bc027eae40f8633bb7))
+
+## [0.3.2-beta.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.3.1...v0.3.2-beta.0) (2026-01-17)
+
 ## [0.3.1](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.3.0...v0.3.1) (2026-01-17)
 
 ## [0.3.0](https://github.com/Seungwoo321/genai-sonar-lint/compare/v0.3.0-beta.0...v0.3.0) (2026-01-17)
